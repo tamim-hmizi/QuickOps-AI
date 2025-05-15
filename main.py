@@ -5,7 +5,6 @@ from transformers import pipeline
 from dotenv import load_dotenv
 import os
 
-# Load environment variables from .env
 load_dotenv()
 
 app = FastAPI(
@@ -14,7 +13,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Hugging Face token from .env
+# Load Hugging Face token
 hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN")
 if not hf_token:
     raise RuntimeError("❌ HUGGINGFACE_HUB_TOKEN not found in .env")
@@ -28,6 +27,7 @@ try:
     )
     print("✅ Generator (Mistral 7B) loaded")
 except Exception as e:
+    generator = None
     print("❌ Generator failed to load:", e)
 
 try:
@@ -37,9 +37,10 @@ try:
     )
     print("✅ Classifier loaded")
 except Exception as e:
+    classifier = None
     print("❌ Classifier failed to load:", e)
 
-# Data models
+# Schemas
 class RepoData(BaseModel):
     repoUrl: str
     metadata: Dict[str, Any]
@@ -55,6 +56,11 @@ def health_check():
 
 @app.post("/analyze")
 async def analyze_deployment(project: MultiRepoInput):
+    if generator is None:
+        return {"error": "❌ Generator model not loaded"}
+    if classifier is None:
+        return {"error": "❌ Classifier model not loaded"}
+
     frontend_info = f"""
 Frontend Repository:
 - URL: {project.frontend.repoUrl}

@@ -6,3 +6,4 @@ accelerate
 pydantic
 scipy
 python-dotenv
+requests

@@ -3,10 +3,10 @@ FROM python:3.10-slim
 WORKDIR /app
 
 COPY . /app
-
 COPY .env /app/.env
 
-RUN pip install --upgrade pip \
+RUN apt-get update && apt-get install -y curl \
+  && pip install --upgrade pip \
   && pip install -r requirements.txt
 
 EXPOSE 8001
