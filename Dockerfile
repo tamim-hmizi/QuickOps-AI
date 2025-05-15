@@ -8,7 +8,7 @@ RUN pip install --upgrade pip \
 
 EXPOSE 8001
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=60s --timeout=60s --start-period=60s --retries=10 \
   CMD curl --fail http://localhost:8001/health || exit 1
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]

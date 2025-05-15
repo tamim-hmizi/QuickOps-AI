@@ -5,3 +5,4 @@ torch
 accelerate
 pydantic
 scipy
+python-dotenv

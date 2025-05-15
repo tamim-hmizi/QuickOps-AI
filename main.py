@@ -2,7 +2,11 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from transformers import pipeline
+from dotenv import load_dotenv
 import os
+
+# Load environment variables from .env
+load_dotenv()
 
 app = FastAPI(
     title="QuickOps AI Deployment Advisor",
@@ -10,20 +14,32 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# ✅ Load lightweight models with logging
+# Hugging Face token from .env
+hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN")
+if not hf_token:
+    raise RuntimeError("❌ HUGGINGFACE_HUB_TOKEN not found in .env")
+
+# Load models
 try:
-    generator = pipeline("text-generation", model="tiiuae/falcon-rw-1b")
-    print("✅ Generator model loaded")
+    generator = pipeline(
+        "text-generation",
+        model="mistralai/Mistral-7B-Instruct-v0.1",
+        use_auth_token=hf_token
+    )
+    print("✅ Generator (Mistral 7B) loaded")
 except Exception as e:
-    print("❌ Generator model failed to load:", e)
+    print("❌ Generator failed to load:", e)
 
 try:
-    classifier = pipeline("zero-shot-classification", model="typeform/distilbert-base-uncased-mnli")
-    print("✅ Classifier model loaded")
+    classifier = pipeline(
+        "zero-shot-classification",
+        model="typeform/distilbert-base-uncased-mnli"
+    )
+    print("✅ Classifier loaded")
 except Exception as e:
-    print("❌ Classifier model failed to load:", e)
+    print("❌ Classifier failed to load:", e)
 
-# ✅ Data models
+# Data models
 class RepoData(BaseModel):
     repoUrl: str
     metadata: Dict[str, Any]
@@ -33,15 +49,12 @@ class MultiRepoInput(BaseModel):
     frontend: RepoData
     backends: List[RepoData]
 
-# ✅ Health check
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
 
-# ✅ Analyze endpoint
 @app.post("/analyze")
 async def analyze_deployment(project: MultiRepoInput):
-    # Format frontend info
     frontend_info = f"""
 Frontend Repository:
 - URL: {project.frontend.repoUrl}
@@ -49,7 +62,6 @@ Frontend Repository:
 - Files (sample): {[file['path'] for file in project.frontend.files[:20]]}
 """
 
-    # Format backend blocks
     backend_blocks = []
     for idx, backend in enumerate(project.backends):
         backend_block = f"""
@@ -60,7 +72,6 @@ Backend #{idx + 1} Repository:
 """
         backend_blocks.append(backend_block)
 
-    # Prompt
     prompt = f"""
 You are a DevOps AI assistant.
 
@@ -82,10 +93,9 @@ Here is the project data:
 {''.join(backend_blocks)}
 """
 
-    # Generate response
     response = generator(prompt, max_new_tokens=300)[0]['generated_text']
 
-    # Extract recommendation + explanation
+    # Parse result
     lines = response.splitlines()
     recommendation = "UNKNOWN"
     explanation = ""
@@ -101,7 +111,7 @@ Here is the project data:
         elif explanation:
             explanation += " " + line.strip()
 
-    # Confidence scoring
+    # Confidence analysis
     confidence_result = classifier(
         explanation,
         candidate_labels=["KUBERNETES", "VM"]
