@@ -2,12 +2,28 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from transformers import pipeline
+import os
 
-app = FastAPI()
+app = FastAPI(
+    title="QuickOps AI Deployment Advisor",
+    description="Analyzes GitHub metadata and file structure to recommend VM or Kubernetes deployment.",
+    version="1.0.0"
+)
 
-generator = pipeline("text-generation", model="tiiuae/falcon-rw-1b")
-classifier = pipeline("zero-shot-classification", model="typeform/distilbert-base-uncased-mnli")
+# ✅ Load lightweight models with logging
+try:
+    generator = pipeline("text-generation", model="tiiuae/falcon-rw-1b")
+    print("✅ Generator model loaded")
+except Exception as e:
+    print("❌ Generator model failed to load:", e)
 
+try:
+    classifier = pipeline("zero-shot-classification", model="typeform/distilbert-base-uncased-mnli")
+    print("✅ Classifier model loaded")
+except Exception as e:
+    print("❌ Classifier model failed to load:", e)
+
+# ✅ Data models
 class RepoData(BaseModel):
     repoUrl: str
     metadata: Dict[str, Any]
@@ -17,12 +33,15 @@ class MultiRepoInput(BaseModel):
     frontend: RepoData
     backends: List[RepoData]
 
+# ✅ Health check
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
 
+# ✅ Analyze endpoint
 @app.post("/analyze")
 async def analyze_deployment(project: MultiRepoInput):
+    # Format frontend info
     frontend_info = f"""
 Frontend Repository:
 - URL: {project.frontend.repoUrl}
@@ -30,6 +49,7 @@ Frontend Repository:
 - Files (sample): {[file['path'] for file in project.frontend.files[:20]]}
 """
 
+    # Format backend blocks
     backend_blocks = []
     for idx, backend in enumerate(project.backends):
         backend_block = f"""
@@ -40,6 +60,7 @@ Backend #{idx + 1} Repository:
 """
         backend_blocks.append(backend_block)
 
+    # Prompt
     prompt = f"""
 You are a DevOps AI assistant.
 
@@ -61,8 +82,10 @@ Here is the project data:
 {''.join(backend_blocks)}
 """
 
+    # Generate response
     response = generator(prompt, max_new_tokens=300)[0]['generated_text']
 
+    # Extract recommendation + explanation
     lines = response.splitlines()
     recommendation = "UNKNOWN"
     explanation = ""
@@ -78,11 +101,11 @@ Here is the project data:
         elif explanation:
             explanation += " " + line.strip()
 
+    # Confidence scoring
     confidence_result = classifier(
         explanation,
         candidate_labels=["KUBERNETES", "VM"]
     )
-
     confidence_scores = dict(zip(confidence_result["labels"], confidence_result["scores"]))
 
     return {
