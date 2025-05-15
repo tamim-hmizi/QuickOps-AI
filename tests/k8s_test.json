@@ -1,0 +1,50 @@
+{
+  "frontend": {
+    "repoUrl": "https://github.com/example/vue-frontend",
+    "metadata": {
+      "name": "vue-frontend",
+      "description": "SPA frontend built with Vue.js",
+      "language": "JavaScript",
+      "stars": 20,
+      "topics": ["frontend", "vue", "spa"]
+    },
+    "files": [
+      { "path": "Dockerfile", "type": "blob", "sha": "a123" },
+      { "path": "src/App.vue", "type": "blob", "sha": "a124" },
+      { "path": "src/main.js", "type": "blob", "sha": "a125" },
+      { "path": "public/index.html", "type": "blob", "sha": "a126" }
+    ]
+  },
+  "backends": [
+    {
+      "repoUrl": "https://github.com/example/user-service",
+      "metadata": {
+        "name": "user-service",
+        "description": "A microservice for user management.",
+        "language": "Node.js",
+        "stars": 50,
+        "topics": ["docker", "kubernetes", "microservice", "user"]
+      },
+      "files": [
+        { "path": "Dockerfile", "type": "blob", "sha": "b111" },
+        { "path": "k8s/deployment.yaml", "type": "blob", "sha": "b112" },
+        { "path": "src/index.js", "type": "blob", "sha": "b113" }
+      ]
+    },
+    {
+      "repoUrl": "https://github.com/example/payment-service",
+      "metadata": {
+        "name": "payment-service",
+        "description": "Handles payment processing for the platform.",
+        "language": "Go",
+        "stars": 35,
+        "topics": ["go", "docker", "payments", "k8s"]
+      },
+      "files": [
+        { "path": "Dockerfile", "type": "blob", "sha": "c111" },
+        { "path": "k8s/payment-deploy.yaml", "type": "blob", "sha": "c112" },
+        { "path": "main.go", "type": "blob", "sha": "c113" }
+      ]
+    }
+  ]
+}
