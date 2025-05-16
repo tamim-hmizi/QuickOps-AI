@@ -8,3 +8,5 @@ pydantic
 scipy
 python-dotenv
 requests
+numpy<2
+huggingface_hub[hf_xet]
