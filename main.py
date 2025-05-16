@@ -1,48 +1,56 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Dict, Any
-from transformers import pipeline
 from dotenv import load_dotenv
 import os
 import logging
 
-# Logger setup
+# Logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load .env if needed (for future tokens)
-load_dotenv()
-
-# Init app
+# App
 app = FastAPI(
     title="QuickOps AI Deployment Advisor",
     description="Analyzes GitHub metadata and file structure to recommend VM or Kubernetes deployment.",
     version="1.0.0"
 )
 
-# Load models (generator without token)
+# Global model vars
 generator = None
 classifier = None
 
-try:
-    generator = pipeline(
-        "text-generation",
-        model="HuggingFaceH4/zephyr-7b-alpha",
-        device=-1  # CPU for Docker
-    )
-    logger.info("✅ Generator loaded")
-except Exception as e:
-    logger.error(f"❌ Failed to load generator: {e}")
+# Load .env (optional for future)
+load_dotenv()
 
-try:
-    classifier = pipeline(
-        "zero-shot-classification",
-        model="typeform/distilbert-base-uncased-mnli",
-        device=-1
-    )
-    logger.info("✅ Classifier loaded")
-except Exception as e:
-    logger.error(f"❌ Failed to load classifier: {e}")
+# Model loader
+def load_models():
+    global generator, classifier
+    try:
+        from transformers import pipeline
+        generator = pipeline(
+            "text-generation",
+            model="gpt2",  # ✅ Light, CPU-compatible model
+            device=-1
+        )
+        logger.info("✅ Generator loaded (gpt2)")
+    except Exception as e:
+        logger.error(f"❌ Failed to load generator: {e}")
+
+    try:
+        classifier = pipeline(
+            "zero-shot-classification",
+            model="typeform/distilbert-base-uncased-mnli",
+            device=-1
+        )
+        logger.info("✅ Classifier loaded")
+    except Exception as e:
+        logger.error(f"❌ Failed to load classifier: {e}")
+
+# Trigger model load at startup
+@app.on_event("startup")
+def startup_event():
+    load_models()
 
 # Data models
 class RepoData(BaseModel):
@@ -54,12 +62,14 @@ class MultiRepoInput(BaseModel):
     frontend: RepoData
     backends: List[RepoData]
 
+# Health check
 @app.get("/health")
-def health_check():
-    if generator is None or classifier is None:
-        return {"status": "unhealthy"}
-    return {"status": "ok"}
+def health():
+    if generator and classifier:
+        return {"status": "ok"}
+    return {"status": "unhealthy"}
 
+# Analyze endpoint
 @app.post("/analyze")
 async def analyze_deployment(project: MultiRepoInput):
     if generator is None or classifier is None:
@@ -91,22 +101,17 @@ You are given a full-stack project composed of:
 
 All these repositories are to be deployed together.
 
-Analyze the metadata and file structures, and recommend whether this project should be deployed on:
-- A Virtual Machine (VM), or
-- A Kubernetes Cluster.
-
-Respond in this format:
+Analyze all metadata and file structures, and recommend:
 RECOMMENDATION: [VM or KUBERNETES]
-EXPLANATION: [Your reasoning]
+EXPLANATION: [Why]
 
 Project:
 {frontend_info}
 {''.join(backend_blocks)}
 """
 
-    response = generator(prompt, max_new_tokens=300)[0]["generated_text"]
+    response = generator(prompt, max_new_tokens=150)[0]["generated_text"]
 
-    # Extract recommendation
     lines = response.splitlines()
     recommendation = "UNKNOWN"
     explanation = ""
@@ -122,7 +127,6 @@ Project:
         elif explanation:
             explanation += " " + line.strip()
 
-    # Analyze explanation confidence
     confidence_result = classifier(
         explanation,
         candidate_labels=["KUBERNETES", "VM"]
