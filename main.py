@@ -51,19 +51,29 @@ Backend #{i + 1} Repository:
 """
 
     prompt = f"""
-You are a DevOps assistant.
-Analyze the following project composed of a frontend and multiple backends.
-Recommend whether it should be deployed on a VM or a Kubernetes cluster.
+You are a DevOps expert.
 
-Respond in this format:
-RECOMMENDATION: [VM or KUBERNETES]
-EXPLANATION: [your explanation]
+I have one frontend repository and one or more backend repositories. Your task is to analyze their structure, scale, metadata, and file types to decide whether this application should be deployed using a Virtual Machine (VM) or a Kubernetes (K8s) cluster.
+
+You must take into account:
+- the number of services and their separation,
+- deployment and scalability requirements,
+- whether the project follows a microservice or monolithic architecture,
+- and any infrastructure-related indicators in the metadata.
+
+Respond **strictly** in the following format:
+
+RECOMMENDATION: [VM or KUBERNETES]  
+EXPLANATION: [a clear, concise explanation based on the analysis]
+
+Here is the project context:
 
 {frontend_info}
 {backend_info}
 """
 
-    result = llm(prompt, max_tokens=300)
+
+    result = llm(prompt, max_tokens=25000)
     text = result["choices"][0]["text"].strip()
 
     lines = text.splitlines()
