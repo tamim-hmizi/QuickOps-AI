@@ -1,51 +1,23 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Dict, Any
+from llama_cpp import Llama
 import os
 import logging
-import re
-from dotenv import load_dotenv
 
-# Logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title="QuickOps AI Deployment Advisor",
-    description="Analyzes GitHub metadata and file structure to recommend VM or Kubernetes deployment.",
-    version="1.0.0"
+MODEL_PATH = "models/zephyr-7b-beta.Q8_0.gguf"
+
+llm = Llama(
+    model_path=MODEL_PATH,
+    n_ctx=2048,
+    n_threads=4,
+    use_mlock=True
 )
 
-generator = None
-classifier = None
-
-def load_models():
-    global generator, classifier
-    from transformers import pipeline
-
-    try:
-        generator = pipeline(
-            "text-generation",
-            model="tiiuae/falcon-rw-1b",  # ✅ public, no token needed
-            device=-1
-        )
-        logger.info("✅ Generator loaded: Falcon-RW-1B")
-    except Exception as e:
-        logger.error(f"❌ Generator failed: {e}")
-
-    try:
-        classifier = pipeline(
-            "zero-shot-classification",
-            model="typeform/distilbert-base-uncased-mnli",
-            device=-1
-        )
-        logger.info("✅ Classifier loaded")
-    except Exception as e:
-        logger.error(f"❌ Classifier failed: {e}")
-
-@app.on_event("startup")
-def startup_event():
-    load_models()
+app = FastAPI()
 
 class RepoData(BaseModel):
     repoUrl: str
@@ -57,14 +29,11 @@ class MultiRepoInput(BaseModel):
     backends: List[RepoData]
 
 @app.get("/health")
-def health():
-    return {"status": "ok" if generator and classifier else "unhealthy"}
+def health_check():
+    return {"status": "ok"}
 
 @app.post("/analyze")
 async def analyze_deployment(project: MultiRepoInput):
-    if generator is None or classifier is None:
-        return {"error": "Models not loaded"}
-
     frontend_info = f"""
 Frontend Repository:
 - URL: {project.frontend.repoUrl}
@@ -73,49 +42,43 @@ Frontend Repository:
 """
 
     backend_info = ""
-    for idx, backend in enumerate(project.backends):
+    for i, backend in enumerate(project.backends):
         backend_info += f"""
-Backend #{idx+1} Repository:
+Backend #{i + 1} Repository:
 - URL: {backend.repoUrl}
 - Metadata: {backend.metadata}
 - Files: {[file['path'] for file in backend.files[:5]]}
 """
 
     prompt = f"""
-You are a DevOps AI assistant.
+You are a DevOps assistant.
+Analyze the following project composed of a frontend and multiple backends.
+Recommend whether it should be deployed on a VM or a Kubernetes cluster.
 
-Analyze the following project and recommend whether it should be deployed on a VM or on Kubernetes.
-
-Respond only with:
+Respond in this format:
 RECOMMENDATION: [VM or KUBERNETES]
-EXPLANATION: [your detailed reasoning]
+EXPLANATION: [your explanation]
 
 {frontend_info}
 {backend_info}
 """
 
-    logger.info("⚙️ Prompt sent to Falcon-RW-1B...")
-    raw = generator(prompt, max_new_tokens=200, pad_token_id=50256)[0]["generated_text"]
+    result = llm(prompt, max_tokens=300)
+    text = result["choices"][0]["text"].strip()
 
+    lines = text.splitlines()
     recommendation = "UNKNOWN"
     explanation = ""
 
-    for line in raw.splitlines():
-        if match := re.match(r"RECOMMENDATION:\s*(.*)", line.strip(), re.IGNORECASE):
-            recommendation = match.group(1).strip().upper()
-        elif match := re.match(r"EXPLANATION:\s*(.*)", line.strip(), re.IGNORECASE):
-            explanation = match.group(1).strip()
+    for line in lines:
+        if line.strip().upper().startswith("RECOMMENDATION:"):
+            recommendation = line.split(":", 1)[1].strip().upper()
+        elif line.strip().upper().startswith("EXPLANATION:"):
+            explanation = line.split(":", 1)[1].strip()
         elif explanation:
             explanation += " " + line.strip()
 
-    confidence = classifier(
-        explanation,
-        candidate_labels=["KUBERNETES", "VM"]
-    )
-    scores = dict(zip(confidence["labels"], confidence["scores"]))
-
     return {
         "recommendation": recommendation,
-        "explanation": explanation,
-        "confidence": scores
+        "explanation": explanation
     }
