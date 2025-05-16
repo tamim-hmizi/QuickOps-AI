@@ -3,7 +3,11 @@ FROM python:3.10-slim
 WORKDIR /app
 COPY . /app
 
-RUN apt-get update && apt-get install -y libopenblas-dev curl \
+RUN apt-get update && apt-get install -y \
+  libopenblas-dev \
+  curl \
+  build-essential \
+  cmake \
   && pip install --no-cache-dir --upgrade pip \
   && pip install --no-cache-dir -r requirements.txt \
   && mkdir -p /app/models \
