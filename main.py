@@ -4,6 +4,7 @@ from typing import List, Dict, Any
 from llama_cpp import Llama
 import os
 import logging
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ def health_check():
 @app.post("/analyze")
 async def analyze_deployment(project: MultiRepoInput):
     frontend_info = f"""
-Frontend Repository:
+FRONTEND:
 - URL: {project.frontend.repoUrl}
 - Metadata: {project.frontend.metadata}
 - Files: {[file['path'] for file in project.frontend.files[:5]]}
@@ -48,7 +49,7 @@ Frontend Repository:
     backend_info = ""
     for i, backend in enumerate(project.backends):
         backend_info += f"""
-Backend #{i + 1} Repository:
+BACKEND #{i + 1}:
 - URL: {backend.repoUrl}
 - Metadata: {backend.metadata}
 - Files: {[file['path'] for file in backend.files[:5]]}
@@ -57,60 +58,61 @@ Backend #{i + 1} Repository:
     prompt = f"""
 You are a DevOps expert.
 
-I have one frontend repository and one or more backend repositories. Your task is to analyze their structure, scale, metadata, and file types to decide whether this **entire application** (frontend and all backends) should be deployed using a **Virtual Machine (VM)** or a **Kubernetes (K8s) cluster**.
+You are analyzing a full-stack project with one frontend and multiple backends. Based on the structure, metadata, and file contents, decide whether this entire system should be deployed on a **Virtual Machine (VM)** or on a **Kubernetes (K8s)** cluster.
 
-You must consider:
-- the number and separation of services,
-- deployment and scalability needs,
-- architectural style (monolithic vs microservices),
-- metadata indicators,
-- and infrastructure complexity.
+Do not use technical fluff. Just analyze clearly:
+- Are services tightly coupled or independent?
+- Is there anything in the metadata or file structure indicating scale, microservices, or distributed load?
 
-⚠️ You must choose **only one** between VM or Kubernetes for the **entire project**. No hybrid or partial answers. No UNKNOWNs. No hesitation.
+Pick only one: VM or Kubernetes. No hybrid answers. No UNKNOWN. Be firm.
 
-Respond exactly in the following format:
-
+### Format:
 RECOMMENDATION: [VM or KUBERNETES]  
-EXPLANATION: [a clear, justified explanation based on the analysis]
+EXPLANATION: [Short reason, e.g., “The project uses microservices and needs dynamic scaling, so Kubernetes is better.”]
 
-Here is the project context:
-
+Here is the project data:
 {frontend_info}
 {backend_info}
 """
 
     def call_llm_and_parse():
-        result = llm(prompt, max_tokens=30000)
-        text = result["choices"][0]["text"].strip()
+        try:
+            response = llm(prompt, max_tokens=2048)
+            text = response["choices"][0]["text"].strip()
 
-        recommendation = None
-        explanation = ""
-        for line in text.splitlines():
-            if line.strip().upper().startswith("RECOMMENDATION:"):
-                value = line.split(":", 1)[1].strip().upper()
-                if "VM" in value:
-                    recommendation = "VM"
-                elif "KUBERNETES" in value:
-                    recommendation = "KUBERNETES"
-            elif line.strip().upper().startswith("EXPLANATION:"):
-                explanation = line.split(":", 1)[1].strip()
-            elif explanation:
-                explanation += " " + line.strip()
-        return recommendation, explanation
+            recommendation = None
+            explanation = ""
+            for line in text.splitlines():
+                if line.strip().upper().startswith("RECOMMENDATION:"):
+                    value = line.split(":", 1)[1].strip().upper()
+                    if "KUBERNETES" in value:
+                        recommendation = "KUBERNETES"
+                    elif "VM" in value:
+                        recommendation = "VM"
+                elif line.strip().upper().startswith("EXPLANATION:"):
+                    explanation = line.split(":", 1)[1].strip()
+                elif explanation:
+                    explanation += " " + line.strip()
+            return recommendation, explanation
+        except Exception as e:
+            logger.error(f"LLM call failed: {e}")
+            return None, ""
 
-    # First try
-    recommendation, explanation = call_llm_and_parse()
-
-    # Retry once if response is invalid
-    if recommendation not in ["VM", "KUBERNETES"]:
-        logger.warning("⚠️ LLM did not return a clear recommendation. Retrying once...")
+    # Try with retries
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
         recommendation, explanation = call_llm_and_parse()
+        if recommendation in ["VM", "KUBERNETES"]:
+            logger.info(f"✅ LLM success on attempt {attempt}")
+            return {
+                "recommendation": recommendation,
+                "explanation": explanation
+            }
+        logger.warning(f"⚠️ Attempt {attempt} failed. Retrying...")
+        time.sleep(1)
 
-    # Raise error if still not valid
-    if recommendation not in ["VM", "KUBERNETES"]:
-        raise ValueError("❌ LLM failed to provide a clear RECOMMENDATION. Please refine the prompt or check the model output.")
-
+    logger.error("❌ LLM failed after multiple attempts. No valid recommendation.")
     return {
-        "recommendation": recommendation,
-        "explanation": explanation
+        "recommendation": "ERROR",
+        "explanation": "Model could not decide after multiple retries. Please refine the metadata or try again later."
     }
