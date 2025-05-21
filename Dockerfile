@@ -4,7 +4,6 @@ WORKDIR /app
 
 COPY . /app
 
-# Dépendances système nécessaires
 RUN apt-get update && apt-get install -y \
   libopenblas-dev \
   curl \
@@ -12,12 +11,11 @@ RUN apt-get update && apt-get install -y \
   cmake \
   git \
   ccache \
-  && pip install --no-cache-dir --upgrade pip \
-  && pip install --no-cache-dir -r requirements.txt \
-  && mkdir -p /app/models \
-  && curl -L -o /app/models/zephyr-7b-beta.Q8_0.gguf "https://huggingface.co/TheBloke/zephyr-7B-beta-GGUF/resolve/main/zephyr-7b-beta.Q8_0.gguf?download=true"
+  && rm -rf /var/lib/apt/lists/*
 
-# Healthcheck pour vérifier l'état de l'API
+RUN pip install --no-cache-dir --upgrade pip \
+  && pip install --no-cache-dir -r requirements.txt
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD curl --fail http://localhost:8001/health || exit 1
 

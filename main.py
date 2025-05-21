@@ -1,29 +1,41 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from llama_cpp import Llama
 import logging
-import time
+import os
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Path to the LLaMA model
-MODEL_PATH = "models/zephyr-7b-beta.Q8_0.gguf"
-
-# Load the model
-llm = Llama(
-    model_path=MODEL_PATH,
-    n_ctx=2048,
-    n_threads=4,
-    use_mlock=True
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
 )
+logger = logging.getLogger("devops-analyzer")
 
-# Initialize FastAPI
-app = FastAPI()
+MODEL_PATH = "models/zephyr-7b-beta.Q8_0.gguf"
+N_CTX = 8192  
+N_THREADS = 30  
+USE_MLOCK = os.getenv("USE_MLOCK", "false").lower() == "true"
+MAX_TOKENS = 8192  
 
-# Define input schemas
+try:
+    llm = Llama(
+        model_path=MODEL_PATH,
+        n_ctx=N_CTX,
+        n_threads=N_THREADS,
+        use_mlock=USE_MLOCK,
+        verbose=False
+    )
+    logger.info("LLM model loaded successfully.")
+except Exception as e:
+    logger.error(f"Error loading LLM model: {e}")
+    raise RuntimeError("Failed to initialize LLM. Verify MODEL_PATH and system resources.")
+
+app = FastAPI(title="DevOps Deployment Analyzer")
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("API started. LLM ready for inference.")
+
 class RepoData(BaseModel):
     repoUrl: str
     metadata: Dict[str, Any]
@@ -35,83 +47,72 @@ class MultiRepoInput(BaseModel):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "message": "LLM is operational."}
 
 @app.post("/analyze")
 async def analyze_deployment(project: MultiRepoInput):
-    # Format frontend data
-    frontend_info = f"""
+    try:
+        frontend_info = f"""
 FRONTEND:
 - URL: {project.frontend.repoUrl}
 - Metadata: {project.frontend.metadata}
-- Files: {[file['path'] for file in project.frontend.files[:5]]}
+- Files: {[file.get('path', 'N/A') for file in project.frontend.files]}
 """
 
-    # Format backend data
-    backend_info = ""
-    for i, backend in enumerate(project.backends):
-        backend_info += f"""
-BACKEND #{i + 1}:
+        backend_info = ""
+        for idx, backend in enumerate(project.backends):
+            backend_info += f"""
+BACKEND #{idx + 1}:
 - URL: {backend.repoUrl}
 - Metadata: {backend.metadata}
-- Files: {[file['path'] for file in backend.files[:5]]}
+- Files: {[file.get('path', 'N/A') for file in backend.files]}
 """
 
-    # Final prompt for LLM
-    prompt = f"""
-You are a DevOps expert.
+        prompt = f"""
+You are a senior DevOps engineer.
 
-You are analyzing a full-stack project with one frontend and one or more backends. Your job is to decide whether this project should be deployed on a **Virtual Machine (VM)** or on a **Kubernetes (K8s)** cluster.
+Analyze the full-stack project described below, consisting of a frontend and multiple backends. Based on the files and metadata provided, recommend if this should be deployed using a Virtual Machine (VM) or a Kubernetes (K8s) cluster.
 
-Use these deployment rules:
-- If the project is a **monolith**, deploy it on a **VM**.
-- If **no Kubernetes-related files** (like Dockerfiles, Helm charts, manifests) are found, deploy to a **VM**.
-- If there are **multiple independent backends**, recommend **Kubernetes**.
-- Choose only ONE deployment type: either **VM** or **KUBERNETES**. No hybrid answers. No "Unknown".
+Rules:
+- If the project is a monolith, use VM.
+- If no Kubernetes-related files are found, use VM.
+- If multiple independent backends are present, use Kubernetes.
+- Choose only ONE: VM or KUBERNETES.
 
-Output format:
+Format your output as:
 RECOMMENDATION: [VM or KUBERNETES]  
-EXPLANATION: [Short reason, e.g., “The project uses microservices and needs dynamic scaling, so Kubernetes is better.”]
+EXPLANATION: [Concise reason here.]
 
-Here is the project data:
+PROJECT DATA:
 {frontend_info}
 {backend_info}
 """
 
-    # Call the LLM and parse response
-    def call_llm_and_parse():
-        try:
-            response = llm(prompt, max_tokens=2048)
-            text = response["choices"][0]["text"].strip()
+        response = llm(prompt, max_tokens=MAX_TOKENS)
+        result_text = response["choices"][0]["text"].strip()
 
-            recommendation = None
-            explanation = ""
-            for line in text.splitlines():
-                if line.strip().upper().startswith("RECOMMENDATION:"):
-                    value = line.split(":", 1)[1].strip().upper()
-                    if "KUBERNETES" in value:
-                        recommendation = "KUBERNETES"
-                    elif "VM" in value:
-                        recommendation = "VM"
-                elif line.strip().upper().startswith("EXPLANATION:"):
-                    explanation = line.split(":", 1)[1].strip()
-                elif explanation:
-                    explanation += " " + line.strip()
-            return recommendation, explanation
-        except Exception as e:
-            logger.error(f"LLM call failed: {e}")
-            return None, ""
+        recommendation = None
+        explanation = ""
+        for line in result_text.splitlines():
+            line_clean = line.strip()
+            if line_clean.upper().startswith("RECOMMENDATION:"):
+                recommendation = line_clean.split(":", 1)[1].strip().upper()
+            elif line_clean.upper().startswith("EXPLANATION:"):
+                explanation = line_clean.split(":", 1)[1].strip()
+            elif explanation:
+                explanation += " " + line_clean
 
-    # Retry until success
-    attempt = 0
-    while True:
-        attempt += 1
-        recommendation, explanation = call_llm_and_parse()
-        if recommendation in ["VM", "KUBERNETES"]:
-            logger.info(f"✅ LLM success on attempt {attempt}")
-            return {
-                "recommendation": recommendation,
-                "explanation": explanation
-            }
-        logger.warning(f"⚠️ Attempt {attempt} failed. Retrying in 1 second...")
-        time.sleep(1)
+        if recommendation not in {"VM", "KUBERNETES"}:
+            logger.warning("No valid recommendation found; defaulting to VM.")
+            recommendation = "VM"
+            explanation = "Defaulted to VM as no clear recommendation was provided."
+
+        logger.info(f"Deployment recommendation: {recommendation}")
+        return {
+            "recommendation": recommendation,
+            "explanation": explanation
+        }
+
+    except Exception as e:
+        logger.exception("Error during LLM analysis.")
+        raise HTTPException(status_code=500, detail="LLM inference failed.")
