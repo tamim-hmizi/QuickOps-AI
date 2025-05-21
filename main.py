@@ -5,6 +5,7 @@ from llama_cpp import Llama
 import logging
 import os
 import json
+import re
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,7 +14,7 @@ logging.basicConfig(
 logger = logging.getLogger("devops-analyzer")
 
 MODEL_PATH = "models/zephyr-7b-beta.Q8_0.gguf"
-N_CTX = 2048 
+N_CTX = 2048
 N_THREADS = 30
 USE_MLOCK = os.getenv("USE_MLOCK", "false").lower() == "true"
 MAX_TOKENS = 2048
@@ -53,6 +54,24 @@ class MultiRepoInput(BaseModel):
 @app.get("/health")
 def health_check():
     return {"status": "ok", "message": "LLM is operational."}
+
+
+def extract_json(text: str) -> Dict[str, Any]:
+    """
+    Extract a JSON object from a string that may contain other text.
+    """
+    try:
+        # Try direct parsing first
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Fallback: Try to extract JSON block manually using regex
+        json_match = re.search(r'\{(?:[^{}]|(?R))*\}', text, re.DOTALL)
+        if json_match:
+            try:
+                return json.loads(json_match.group(0))
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Found JSON block but parsing failed: {e}")
+        raise ValueError("No valid JSON object found in LLM response.")
 
 
 @app.post("/analyze")
@@ -111,16 +130,18 @@ Here is the metadata and file structure of the repositories:
 """
 
         response = llm(prompt, max_tokens=MAX_TOKENS)
-
         result_text = response.get("choices", [{}])[0].get("text", "").strip()
 
         logger.info("Raw LLM Response:\n" + result_text)
 
         try:
-            json_response = json.loads(result_text)
-        except json.JSONDecodeError:
-            logger.warning("LLM response is not valid JSON.")
-            return {"recommendation": "unknown", "explanation": "LLM response parsing failed: " + result_text}
+            json_response = extract_json(result_text)
+        except Exception as e:
+            logger.warning("LLM response is not valid JSON: %s", str(e))
+            return {
+                "recommendation": "unknown",
+                "explanation": f"LLM response parsing failed: {result_text}"
+            }
 
         return json_response
 
