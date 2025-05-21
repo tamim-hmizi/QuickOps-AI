@@ -81,12 +81,27 @@ Your task is to analyze this information and recommend whether to deploy the ove
 - A **Virtual Machine (VM)**, or
 - **Kubernetes (K8s)**.
 
+Take into consideration the presence of:
+- Kubernetes manifests (`k8s/`, `.yaml`, `.yml` files),
+- Dockerfiles,
+- Number of backend services,
+- Topics and metadata (e.g., monolith vs microservices).
+
 Use the following logic:
 - If there is a **single backend repo with no manifest (e.g., Dockerfile, k8s YAMLs)** → recommend **VM**.
 - If there are **multiple backend services**, even without manifests → recommend **Kubernetes**.
 - If there's a **single backend repo containing Kubernetes manifests (like `deployment.yaml`, `service.yaml`, etc.)** → recommend **Kubernetes**.
 
-Explain your reasoning clearly in a short paragraph. Just respond with a plain text recommendation and a concise explanation.
+Explain your reasoning clearly in a short paragraph. Just respond with a  recommendation and a concise explanation.
+
+Return your answer as a **JSON object** with the following format:
+
+{{
+  "recommendation": "vm" or "kubernetes",
+  "explanation": "Detailed reasoning for the chosen deployment method, referencing files, structure, and scalability needs."
+}}
+
+Here is the metadata and file structure of the repositories:
 
 {frontend_info}
 {backend_info}
