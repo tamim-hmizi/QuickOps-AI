@@ -2,15 +2,17 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from llama_cpp import Llama
-import os
 import logging
 import time
 
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Path to the LLaMA model
 MODEL_PATH = "models/zephyr-7b-beta.Q8_0.gguf"
 
+# Load the model
 llm = Llama(
     model_path=MODEL_PATH,
     n_ctx=2048,
@@ -18,27 +20,26 @@ llm = Llama(
     use_mlock=True
 )
 
+# Initialize FastAPI
 app = FastAPI()
 
-
+# Define input schemas
 class RepoData(BaseModel):
     repoUrl: str
     metadata: Dict[str, Any]
     files: List[Dict[str, Any]]
 
-
 class MultiRepoInput(BaseModel):
     frontend: RepoData
     backends: List[RepoData]
-
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
 
-
 @app.post("/analyze")
 async def analyze_deployment(project: MultiRepoInput):
+    # Format frontend data
     frontend_info = f"""
 FRONTEND:
 - URL: {project.frontend.repoUrl}
@@ -46,6 +47,7 @@ FRONTEND:
 - Files: {[file['path'] for file in project.frontend.files[:5]]}
 """
 
+    # Format backend data
     backend_info = ""
     for i, backend in enumerate(project.backends):
         backend_info += f"""
@@ -55,18 +57,19 @@ BACKEND #{i + 1}:
 - Files: {[file['path'] for file in backend.files[:5]]}
 """
 
+    # Final prompt for LLM
     prompt = f"""
 You are a DevOps expert.
 
-You are analyzing a full-stack project with one frontend and multiple backends. Based on the structure, metadata, and file contents, decide whether this entire system should be deployed on a **Virtual Machine (VM)** or on a **Kubernetes (K8s)** cluster.
+You are analyzing a full-stack project with one frontend and one or more backends. Your job is to decide whether this project should be deployed on a **Virtual Machine (VM)** or on a **Kubernetes (K8s)** cluster.
 
-Do not use technical fluff. Just analyze clearly:
-- Are services tightly coupled or independent?
-- Is there anything in the metadata or file structure indicating scale, microservices, or distributed load?
+Use these deployment rules:
+- If the project is a **monolith**, deploy it on a **VM**.
+- If **no Kubernetes-related files** (like Dockerfiles, Helm charts, manifests) are found, deploy to a **VM**.
+- If there are **multiple independent backends**, recommend **Kubernetes**.
+- Choose only ONE deployment type: either **VM** or **KUBERNETES**. No hybrid answers. No "Unknown".
 
-Pick only one: VM or Kubernetes. No hybrid answers. No UNKNOWN. Be firm.
-
-### Format:
+Output format:
 RECOMMENDATION: [VM or KUBERNETES]  
 EXPLANATION: [Short reason, e.g., “The project uses microservices and needs dynamic scaling, so Kubernetes is better.”]
 
@@ -75,6 +78,7 @@ Here is the project data:
 {backend_info}
 """
 
+    # Call the LLM and parse response
     def call_llm_and_parse():
         try:
             response = llm(prompt, max_tokens=2048)
@@ -98,9 +102,10 @@ Here is the project data:
             logger.error(f"LLM call failed: {e}")
             return None, ""
 
-    # Try with retries
-    max_retries = 3
-    for attempt in range(1, max_retries + 1):
+    # Retry until success
+    attempt = 0
+    while True:
+        attempt += 1
         recommendation, explanation = call_llm_and_parse()
         if recommendation in ["VM", "KUBERNETES"]:
             logger.info(f"✅ LLM success on attempt {attempt}")
@@ -108,11 +113,5 @@ Here is the project data:
                 "recommendation": recommendation,
                 "explanation": explanation
             }
-        logger.warning(f"⚠️ Attempt {attempt} failed. Retrying...")
+        logger.warning(f"⚠️ Attempt {attempt} failed. Retrying in 1 second...")
         time.sleep(1)
-
-    logger.error("❌ LLM failed after multiple attempts. No valid recommendation.")
-    return {
-        "recommendation": "ERROR",
-        "explanation": "Model could not decide after multiple retries. Please refine the metadata or try again later."
-    }
