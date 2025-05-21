@@ -12,10 +12,10 @@ logging.basicConfig(
 logger = logging.getLogger("devops-analyzer")
 
 MODEL_PATH = "models/zephyr-7b-beta.Q8_0.gguf"
-N_CTX = 25000
+N_CTX = 32768
 N_THREADS = 30  
 USE_MLOCK = os.getenv("USE_MLOCK", "false").lower() == "true"
-MAX_TOKENS = 25000  
+MAX_TOKENS = 32768  
 
 try:
     llm = Llama(
@@ -53,37 +53,34 @@ def health_check():
 async def analyze_deployment(project: MultiRepoInput):
     try:
         frontend_info = f"""
-FRONTEND:
-- URL: {project.frontend.repoUrl}
-- Metadata: {project.frontend.metadata}
+Frontend Repo:
+- Name: {project.frontend.metadata.get('name')}
+- Language: {project.frontend.metadata.get('language')}
 - Files: {[file.get('path', 'N/A') for file in project.frontend.files]}
 """
 
         backend_info = ""
         for idx, backend in enumerate(project.backends):
             backend_info += f"""
-BACKEND #{idx + 1}:
-- URL: {backend.repoUrl}
-- Metadata: {backend.metadata}
+Backend #{idx + 1}:
+- Name: {backend.metadata.get('name')}
+- Language: {backend.metadata.get('language')}
 - Files: {[file.get('path', 'N/A') for file in backend.files]}
 """
 
         prompt = f"""
 You are a senior DevOps engineer.
 
-Analyze the full-stack project described below, consisting of a frontend and multiple backends. Based on the files and metadata provided, recommend if this should be deployed using a Virtual Machine (VM) or a Kubernetes (K8s) cluster.
+Your task is to analyze the following frontend and backends and determine whether the project should be deployed using a Virtual Machine (VM) or Kubernetes (K8s).
 
 Rules:
-- If the project is a monolith, use VM.
-- If no Kubernetes-related files are found, use VM.
-- If multiple independent backends are present, use Kubernetes.
-- Choose only ONE: VM or KUBERNETES.
+- Use **VM** for monolithic or single backend applications.
+- Use **KUBERNETES** if there are multiple independent services or microservices.
+- Choose only one: either "VM" or "KUBERNETES".
+- Return ONLY JSON like this: {{ "recommendation": "VM" or "KUBERNETES", "explanation": "one-line explanation" }}
 
-Format your output as:
-RECOMMENDATION: [VM or KUBERNETES]  
-EXPLANATION: [Concise reason here.]
+Do not repeat the prompt or include anything else. Just return the JSON.
 
-PROJECT DATA:
 {frontend_info}
 {backend_info}
 """
@@ -93,11 +90,17 @@ PROJECT DATA:
 
         logger.info("Raw LLM Response:\n" + result_text)
 
-        return {
-            "raw_output": result_text
-        }
+        # Clean up and parse LLM's response as JSON
+        import json
+        try:
+            parsed = json.loads(result_text)
+            return parsed
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON returned by LLM.")
+            raise HTTPException(status_code=500, detail="LLM returned invalid JSON.")
 
     except Exception as e:
         logger.exception("Error during LLM analysis.")
         raise HTTPException(status_code=500, detail="LLM inference failed.")
+
 
