@@ -12,11 +12,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("devops-analyzer")
 
-MODEL_PATH = "models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
-N_CTX = 4096
+MODEL_PATH = "models/phi-2.Q4_K_M.gguf"
+N_CTX = 2048 
 N_THREADS = 30
 USE_MLOCK = os.getenv("USE_MLOCK", "false").lower() == "true"
-MAX_TOKENS = 4096
+MAX_TOKENS = 2048
 
 try:
     llm = Llama(
@@ -112,16 +112,13 @@ Here is the metadata and file structure of the repositories:
 
         response = llm(prompt, max_tokens=MAX_TOKENS)
 
-        # Extract text safely - tinyllama returns choices with 'text' key
         result_text = response.get("choices", [{}])[0].get("text", "").strip()
 
         logger.info("Raw LLM Response:\n" + result_text)
 
-        # Try parsing the LLM JSON output (in case it's valid JSON)
         try:
             json_response = json.loads(result_text)
         except json.JSONDecodeError:
-            # If not JSON, return raw text with warning
             logger.warning("LLM response is not valid JSON.")
             return {"recommendation": "unknown", "explanation": "LLM response parsing failed: " + result_text}
 
