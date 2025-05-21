@@ -52,35 +52,41 @@ def health_check():
 @app.post("/analyze")
 async def analyze_deployment(project: MultiRepoInput):
     try:
+        # Format frontend info
         frontend_info = f"""
-Frontend Repo:
-- Name: {project.frontend.metadata.get('name')}
-- Language: {project.frontend.metadata.get('language')}
+Frontend Repository:
+- URL: {project.frontend.repoUrl}
+- Metadata: {project.frontend.metadata}
 - Files: {[file.get('path', 'N/A') for file in project.frontend.files]}
 """
 
+        # Format backend info
         backend_info = ""
         for idx, backend in enumerate(project.backends):
             backend_info += f"""
 Backend #{idx + 1}:
-- Name: {backend.metadata.get('name')}
-- Language: {backend.metadata.get('language')}
+- URL: {backend.repoUrl}
+- Metadata: {backend.metadata}
 - Files: {[file.get('path', 'N/A') for file in backend.files]}
 """
 
+        # Updated prompt
         prompt = f"""
-JSON-only output.
+DONT REGIVE ME THE PROMPT.
 You are a senior DevOps engineer.
 
-Your task is to analyze the following frontend and backends and determine whether the project should be deployed using a Virtual Machine (VM) or Kubernetes (K8s).
+You will be given a **frontend repository** and an **array of backend repositories**, including their metadata and file listings.
 
-Rules:
-- Use **VM** for monolithic or single backend applications.
-- Use **KUBERNETES** if there are multiple independent services or microservices.
-- Choose only one: either "VM" or "KUBERNETES".
-- Return ONLY JSON like this: {{ "recommendation": "VM" or "KUBERNETES", "explanation": "one-line explanation" }}
+Your task is to analyze this information and recommend whether to deploy the overall project using:
+- A **Virtual Machine (VM)**, or
+- **Kubernetes (K8s)**.
 
-Do not repeat the prompt or include anything else. Just return the JSON.
+Use the following logic:
+- If there is a **single backend repo with no manifest (e.g., Dockerfile, k8s YAMLs)** → recommend **VM**.
+- If there are **multiple backend services**, even without manifests → recommend **Kubernetes**.
+- If there's a **single backend repo containing Kubernetes manifests (like `deployment.yaml`, `service.yaml`, etc.)** → recommend **Kubernetes**.
+
+Explain your reasoning clearly in a short paragraph. Just respond with a plain text recommendation and a concise explanation.
 
 {frontend_info}
 {backend_info}
@@ -91,16 +97,11 @@ Do not repeat the prompt or include anything else. Just return the JSON.
 
         logger.info("Raw LLM Response:\n" + result_text)
 
-        import json
-        try:
-            parsed = json.loads(result_text)
-            return parsed
-        except json.JSONDecodeError:
-            logger.error("Invalid JSON returned by LLM.")
-            raise HTTPException(status_code=500, detail="LLM returned invalid JSON.")
+        return {"recommendation": result_text}
 
     except Exception as e:
         logger.exception("Error during LLM analysis.")
         raise HTTPException(status_code=500, detail="LLM inference failed.")
+
 
 
