@@ -69,6 +69,7 @@ Backend #{idx + 1}:
 """
 
         prompt = f"""
+JSON-only output.
 You are a senior DevOps engineer.
 
 Your task is to analyze the following frontend and backends and determine whether the project should be deployed using a Virtual Machine (VM) or Kubernetes (K8s).
@@ -90,7 +91,6 @@ Do not repeat the prompt or include anything else. Just return the JSON.
 
         logger.info("Raw LLM Response:\n" + result_text)
 
-        # Clean up and parse LLM's response as JSON
         import json
         try:
             parsed = json.loads(result_text)
