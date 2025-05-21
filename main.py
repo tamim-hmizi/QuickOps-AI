@@ -12,7 +12,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("devops-analyzer")
 
-MODEL_PATH = "models/phi-2.Q4_K_M.gguf"
+MODEL_PATH = "models/zephyr-7b-beta.Q8_0.gguf"
 N_CTX = 2048 
 N_THREADS = 30
 USE_MLOCK = os.getenv("USE_MLOCK", "false").lower() == "true"
