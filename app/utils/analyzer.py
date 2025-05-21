@@ -1,19 +1,18 @@
 def flatten_topics(repo):
     return " ".join(repo["metadata"].get("topics", []))
 
-def generate_prompt(project: dict) -> str:
-    prompt = "Given the project structure, recommend either VM or Kubernetes:\n\n"
-
-    prompt += f"Frontend Repo:\n"
+def generate_prompt(project):
+    prompt = f"Frontend:\n"
     prompt += f"- Language: {project['frontend']['metadata']['language']}\n"
-    prompt += f"- Topics: {flatten_topics(project['frontend'])}\n"
-    prompt += f"- Files: {[f['path'] for f in project['frontend']['files']]}\n\n"
+    prompt += f"- Topics: {project['frontend']['metadata']['topics']}\n"
+    prompt += f"- Files: {project['frontend']['files']}\n\n"
 
-    for i, backend in enumerate(project['backends']):
-        prompt += f"Backend {i+1}:\n"
+    for backend in project['backends']:
+        prompt += f"Backend: {backend['name']}\n"
         prompt += f"- Language: {backend['metadata']['language']}\n"
-        prompt += f"- Topics: {flatten_topics(backend)}\n"
-        prompt += f"- Files: {[f['path'] for f in backend['files']]}\n\n"
+        prompt += f"- Topics: {backend['metadata']['topics']}\n"
+        prompt += f"- Files: {backend['files']}\n\n"
 
-    prompt += 'Output in this format:\n{ "recommendation": "vm" or "k8s", "explanation": "short reason" }'
+    prompt += "Based on this architecture, should this project be deployed on Kubernetes or a Virtual Machine?\n"
     return prompt
+
