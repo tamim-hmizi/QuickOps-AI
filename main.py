@@ -12,10 +12,10 @@ logging.basicConfig(
 logger = logging.getLogger("devops-analyzer")
 
 MODEL_PATH = "models/zephyr-7b-beta.Q8_0.gguf"
-N_CTX = 8192  
+N_CTX = 25000
 N_THREADS = 30  
 USE_MLOCK = os.getenv("USE_MLOCK", "false").lower() == "true"
-MAX_TOKENS = 8192  
+MAX_TOKENS = 25000  
 
 try:
     llm = Llama(
