@@ -1,0 +1,30 @@
+base_model: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+model_type: LlamaForCausalLM
+load_in_8bit: false
+load_in_4bit: true
+gptq: false
+
+datasets:
+  - path: ./data/training.jsonl
+    type: json
+
+dataset_prepared_path: ./data/processed
+val_set_size: 0.05
+adapter: qlora
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.1
+
+sequence_len: 2048
+sample_packing: false
+pad_to_sequence_len: true
+train_on_inputs: false
+gradient_checkpointing: true
+batch_size: 2
+micro_batch_size: 1
+num_epochs: 3
+optimizer: adamw
+lr_scheduler: cosine
+learning_rate: 2e-5
+
+output_dir: ./model/final-checkpoint

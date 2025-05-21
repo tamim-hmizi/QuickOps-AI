@@ -2,6 +2,3 @@ fastapi
 uvicorn
 llama-cpp-python
 pydantic
-python-multipart
-requests
-pytest
