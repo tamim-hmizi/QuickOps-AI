@@ -1,0 +1,20 @@
+{
+  "frontend": {
+    "name": "ui-monolith",
+    "description": "Simple UI served from Express backend",
+    "language": "HTML",
+    "stars": 12,
+    "topics": ["html", "css"],
+    "files": ["index.html", "styles.css"]
+  },
+  "backends": [
+    {
+      "name": "main-backend",
+      "description": "Monolithic Express server with MongoDB integration and no container setup",
+      "language": "JavaScript",
+      "stars": 18,
+      "topics": ["express", "mongodb"],
+      "files": ["server.js", "routes.js", "models.js"]
+    }
+  ]
+}

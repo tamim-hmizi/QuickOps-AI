@@ -1,0 +1,28 @@
+{
+  "frontend": {
+    "name": "frontend-app",
+    "description": "React application with Dockerfile and NGINX setup",
+    "language": "JavaScript",
+    "stars": 42,
+    "topics": ["docker", "react", "nginx"],
+    "files": ["Dockerfile", "nginx.conf", "vite.config.ts", "src/main.jsx"]
+  },
+  "backends": [
+    {
+      "name": "auth-service",
+      "description": "Node.js microservice for authentication with Kubernetes manifests",
+      "language": "TypeScript",
+      "stars": 35,
+      "topics": ["kubernetes", "microservice", "express", "mongodb"],
+      "files": ["Dockerfile", "k8s/deployment.yaml", "k8s/service.yaml", "src/auth.ts"]
+    },
+    {
+      "name": "order-service",
+      "description": "Handles order processing and payment with Docker and Helm charts",
+      "language": "Go",
+      "stars": 27,
+      "topics": ["helm", "go", "microservice", "grpc"],
+      "files": ["Dockerfile", "helm/Chart.yaml", "main.go"]
+    }
+  ]
+}
