@@ -18,5 +18,5 @@ class ProjectInput(BaseModel):
     backends: List[Repo]
 
 class ProjectRecommendation(BaseModel):
-    recommendation: str  # "vm" or "k8s"
+    recommendation: str 
     explanation: str

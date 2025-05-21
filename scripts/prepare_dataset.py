@@ -3,15 +3,15 @@ from app.utils.analyzer import generate_prompt
 
 def convert_to_prompt(project_json):
     prompt = generate_prompt(project_json)
-    if "k8s" in prompt:
+    if any("k8s" in topic or "kubernetes" in topic for backend in project_json["backends"] for topic in backend["metadata"]["topics"]):
         output = {
             "recommendation": "k8s",
-            "explanation": "Multiple microservices with Docker and Kubernetes configs suggest k8s."
+            "explanation": "Multiple microservices with container orchestration hint at Kubernetes."
         }
     else:
         output = {
             "recommendation": "vm",
-            "explanation": "Single monolithic backend with no container orchestration hints at VM."
+            "explanation": "Monolithic architecture without orchestration favors VM deployment."
         }
     return {"prompt": prompt, "output": json.dumps(output)}
 

@@ -11,12 +11,11 @@ RUN apt-get update && apt-get install -y \
   build-essential \
   cmake \
   git \
-  ccache \
   && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-  && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+  pip install --no-cache-dir -r requirements.txt
 
 COPY ./app ./app
 COPY ./data ./data
@@ -28,7 +27,7 @@ ENV PYTHONPATH=/app
 # Prepare dataset
 RUN python scripts/prepare_dataset.py
 
-# Fine-tune + merge
+# Fine-tune and merge CPU-based model
 RUN axolotl train model/axolotl-config.yaml && \
   axolotl merge model/final-checkpoint --output model/final-checkpoint/merged.gguf
 
