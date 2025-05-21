@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
   && pip install --no-cache-dir -r requirements.txt \
-  && pip install --no-cache-dir axolotl==0.4.1  # pin Axolotl for stability
+  && pip install --no-cache-dir axolotl
 
 # Copy project files
 COPY ./app ./app
