@@ -1,4 +1,11 @@
 fastapi
 uvicorn
+transformers
+peft
+accelerate
+scipy
+sentencepiece
+datasets
+loguru
+python-dotenv
 llama-cpp-python
-pydantic

@@ -1,10 +1,5 @@
 from pydantic import BaseModel
-from typing import List
-
-class File(BaseModel):
-    path: str
-    type: str
-    sha: str
+from typing import List, Optional
 
 class Metadata(BaseModel):
     name: str
@@ -14,9 +9,9 @@ class Metadata(BaseModel):
     topics: List[str]
 
 class Repo(BaseModel):
-    repoUrl: str
+    repoUrl: Optional[str] = None
     metadata: Metadata
-    files: List[File]
+    files: List[str]
 
 class ProjectInput(BaseModel):
     frontend: Repo
