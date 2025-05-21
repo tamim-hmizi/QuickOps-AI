@@ -1,9 +1,10 @@
-FROM python:3.10-slim
+# ============================
+# STAGE 1: TRAINING + MERGE
+# ============================
+FROM python:3.10-slim AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
   libopenblas-dev \
   curl \
@@ -13,32 +14,40 @@ RUN apt-get update && apt-get install -y \
   ccache \
   && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
-  && pip install --no-cache-dir -r requirements.txt \
-  && pip install --no-cache-dir axolotl
+  && pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
 COPY ./app ./app
 COPY ./data ./data
 COPY ./model ./model
 COPY ./scripts ./scripts
 
-# Ensure Python can find all modules
 ENV PYTHONPATH=/app
 
-# Prepare training dataset
+# Prepare dataset
 RUN python scripts/prepare_dataset.py
 
-# Run fine-tuning with Axolotl
-RUN axolotl train model/axolotl-config.yaml
+# Fine-tune + merge
+RUN axolotl train model/axolotl-config.yaml && \
+  axolotl merge model/final-checkpoint --output model/final-checkpoint/merged.gguf
 
-# Merge LoRA adapters to GGUF
-RUN axolotl merge model/final-checkpoint --output model/final-checkpoint/merged.gguf
+# ============================
+# STAGE 2: API ONLY
+# ============================
+FROM python:3.10-slim
 
-# Expose API port
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y libopenblas-dev && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY --from=builder /app/app ./app
+COPY --from=builder /app/model/final-checkpoint ./model/final-checkpoint
+
+ENV PYTHONPATH=/app
+
 EXPOSE 8001
-
-# Start the FastAPI application
 CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8001"]
