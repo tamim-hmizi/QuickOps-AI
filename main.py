@@ -91,28 +91,13 @@ PROJECT DATA:
         response = llm(prompt, max_tokens=MAX_TOKENS)
         result_text = response["choices"][0]["text"].strip()
 
-        recommendation = None
-        explanation = ""
-        for line in result_text.splitlines():
-            line_clean = line.strip()
-            if line_clean.upper().startswith("RECOMMENDATION:"):
-                recommendation = line_clean.split(":", 1)[1].strip().upper()
-            elif line_clean.upper().startswith("EXPLANATION:"):
-                explanation = line_clean.split(":", 1)[1].strip()
-            elif explanation:
-                explanation += " " + line_clean
+        logger.info("Raw LLM Response:\n" + result_text)
 
-        if recommendation not in {"VM", "KUBERNETES"}:
-            logger.warning("No valid recommendation found; defaulting to VM.")
-            recommendation = "VM"
-            explanation = "Defaulted to VM as no clear recommendation was provided."
-
-        logger.info(f"Deployment recommendation: {recommendation}")
         return {
-            "recommendation": recommendation,
-            "explanation": explanation
+            "raw_output": result_text
         }
 
     except Exception as e:
         logger.exception("Error during LLM analysis.")
         raise HTTPException(status_code=500, detail="LLM inference failed.")
+
