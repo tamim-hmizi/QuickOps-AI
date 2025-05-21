@@ -4,6 +4,7 @@ from typing import List, Dict, Any
 from llama_cpp import Llama
 import logging
 import os
+import json
 
 logging.basicConfig(
     level=logging.INFO,
@@ -11,11 +12,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("devops-analyzer")
 
-MODEL_PATH = "models/zephyr-7b-beta.Q8_0.gguf"
-N_CTX = 32768
-N_THREADS = 30  
+MODEL_PATH = "models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
+N_CTX = 4096
+N_THREADS = 30
 USE_MLOCK = os.getenv("USE_MLOCK", "false").lower() == "true"
-MAX_TOKENS = 32768  
+MAX_TOKENS = 4096
 
 try:
     llm = Llama(
@@ -23,7 +24,7 @@ try:
         n_ctx=N_CTX,
         n_threads=N_THREADS,
         use_mlock=USE_MLOCK,
-        verbose=False
+        verbose=False,
     )
     logger.info("LLM model loaded successfully.")
 except Exception as e:
@@ -32,27 +33,31 @@ except Exception as e:
 
 app = FastAPI(title="DevOps Deployment Analyzer")
 
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("API started. LLM ready for inference.")
+
 
 class RepoData(BaseModel):
     repoUrl: str
     metadata: Dict[str, Any]
     files: List[Dict[str, Any]]
 
+
 class MultiRepoInput(BaseModel):
     frontend: RepoData
     backends: List[RepoData]
+
 
 @app.get("/health")
 def health_check():
     return {"status": "ok", "message": "LLM is operational."}
 
+
 @app.post("/analyze")
 async def analyze_deployment(project: MultiRepoInput):
     try:
-        # Format frontend info
         frontend_info = f"""
 Frontend Repository:
 - URL: {project.frontend.repoUrl}
@@ -60,7 +65,6 @@ Frontend Repository:
 - Files: {[file.get('path', 'N/A') for file in project.frontend.files]}
 """
 
-        # Format backend info
         backend_info = ""
         for idx, backend in enumerate(project.backends):
             backend_info += f"""
@@ -70,7 +74,6 @@ Backend #{idx + 1}:
 - Files: {[file.get('path', 'N/A') for file in backend.files]}
 """
 
-        # Updated prompt
         prompt = f"""
 DONT REGIVE ME THE PROMPT.
 You are a senior DevOps engineer.
@@ -92,7 +95,7 @@ Use the following logic:
 - If there are **multiple backend services**, even without manifests → recommend **Kubernetes**.
 - If there's a **single backend repo containing Kubernetes manifests (like `deployment.yaml`, `service.yaml`, etc.)** → recommend **Kubernetes**.
 
-Explain your reasoning clearly in a short paragraph. Just respond with a  recommendation and a concise explanation.
+Explain your reasoning clearly in a short paragraph. Just respond with a recommendation and a concise explanation.
 
 Return your answer as a **JSON object** with the following format:
 
@@ -108,15 +111,22 @@ Here is the metadata and file structure of the repositories:
 """
 
         response = llm(prompt, max_tokens=MAX_TOKENS)
-        result_text = response["choices"][0]["text"].strip()
+
+        # Extract text safely - tinyllama returns choices with 'text' key
+        result_text = response.get("choices", [{}])[0].get("text", "").strip()
 
         logger.info("Raw LLM Response:\n" + result_text)
 
-        return {"recommendation": result_text}
+        # Try parsing the LLM JSON output (in case it's valid JSON)
+        try:
+            json_response = json.loads(result_text)
+        except json.JSONDecodeError:
+            # If not JSON, return raw text with warning
+            logger.warning("LLM response is not valid JSON.")
+            return {"recommendation": "unknown", "explanation": "LLM response parsing failed: " + result_text}
+
+        return json_response
 
     except Exception as e:
         logger.exception("Error during LLM analysis.")
         raise HTTPException(status_code=500, detail="LLM inference failed.")
-
-
-
