@@ -23,14 +23,14 @@ RUN git clone https://github.com/abetlen/llama-cpp-python.git && \
   cd llama-cpp-python && \
   pip install --no-cache-dir . --config-settings=--build-option=--use-cpu
 
-# Copier code et dataset
+# Copier tout le projet
 COPY . ./
 ENV PYTHONPATH=/app
 
-# Préparation dataset pour le fine-tuning
+# Préparation du dataset
 RUN python scripts/prepare_dataset.py
 
-# Fine-tuning via Axolotl + fusion GGUF finale
+# Fine-tuning + fusion GGUF
 RUN axolotl train model/axolotl-config.yaml && \
   axolotl merge model/final-checkpoint --output model/final-checkpoint/merged.gguf
 
@@ -39,8 +39,13 @@ FROM python:3.10-slim AS runner
 
 WORKDIR /app
 
-# Installer dépendances système minimales
-RUN apt-get update && apt-get install -y libopenblas-dev cmake ninja-build && rm -rf /var/lib/apt/lists/*
+# ✅ Installer git (correction de l’erreur) + autres dépendances
+RUN apt-get update && apt-get install -y \
+  git \
+  libopenblas-dev \
+  cmake \
+  ninja-build \
+  && rm -rf /var/lib/apt/lists/*
 
 # Installer pip & dépendances Python (sans llama-cpp-python)
 COPY requirements.txt ./
@@ -52,7 +57,7 @@ RUN git clone https://github.com/abetlen/llama-cpp-python.git && \
   cd llama-cpp-python && \
   pip install --no-cache-dir . --config-settings=--build-option=--use-cpu
 
-# Copier le code de l’API + modèle entraîné
+# Copier code et modèle entraîné depuis le builder
 COPY --from=builder /app/app ./app
 COPY --from=builder /app/model/final-checkpoint ./model/final-checkpoint
 
