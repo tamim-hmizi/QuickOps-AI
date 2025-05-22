@@ -14,13 +14,23 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip
-RUN grep -v llama-cpp-python requirements.txt > temp-req.txt && pip install --no-cache-dir -r temp-req.txt
 
-# ✅ Installer Axolotl sans extras (évite bitsandbytes)
+# ✅ Installer tous sauf llama-cpp-python
+RUN grep -v llama-cpp-python requirements.txt > temp-req.txt && \
+  pip install --no-cache-dir -r temp-req.txt
+
+# ✅ Installer Axolotl SANS bitsandbytes
 RUN pip install --no-cache-dir axolotl --no-deps
-RUN pip install --no-cache-dir fire pydantic accelerate datasets
 
-# ✅ Installer llama-cpp-python avec support CPU
+# ✅ Installer manuellement ses dépendances critiques
+RUN pip install --no-cache-dir \
+  fire \
+  pydantic \
+  accelerate \
+  datasets \
+  colorama
+
+# ✅ Installer llama-cpp-python (CPU only)
 ENV CMAKE_ARGS="-DLLAMA_CUBLAS=OFF"
 RUN git clone --recurse-submodules https://github.com/abetlen/llama-cpp-python.git && \
   cd llama-cpp-python && pip install .
@@ -32,6 +42,7 @@ COPY . ./
 ENV PYTHONPATH=/app
 
 RUN python scripts/prepare_dataset.py
+
 RUN axolotl train model/axolotl-config.yaml && \
   axolotl merge model/final-checkpoint --output model/final-checkpoint/merged.gguf
 

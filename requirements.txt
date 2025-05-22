@@ -10,3 +10,4 @@ loguru
 python-dotenv
 fire
 pydantic
+colorama

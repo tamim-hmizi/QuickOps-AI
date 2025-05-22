@@ -4,7 +4,7 @@ trust_remote_code: true
 device_map: auto
 
 load_in_8bit: false
-load_in_4bit: true # ✅ requis avec QLoRA
+load_in_4bit: true # ✅ OBLIGATOIRE avec QLoRA
 gptq: false
 
 datasets:
