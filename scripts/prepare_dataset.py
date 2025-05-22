@@ -2,7 +2,9 @@ import json
 from app.utils.analyzer import generate_prompt
 
 def convert_to_prompt(project_json):
-    prompt = generate_prompt(project_json)
+    instruction = "Based on the given architecture, recommend 'k8s' or 'vm'."
+    input_text = generate_prompt(project_json)
+
     if any("k8s" in topic or "kubernetes" in topic for backend in project_json["backends"] for topic in backend["metadata"]["topics"]):
         output = {
             "recommendation": "k8s",
@@ -13,7 +15,12 @@ def convert_to_prompt(project_json):
             "recommendation": "vm",
             "explanation": "Monolithic architecture without orchestration favors VM deployment."
         }
-    return {"prompt": prompt, "output": json.dumps(output)}
+
+    return {
+        "instruction": instruction,
+        "input": input_text,
+        "output": json.dumps(output)
+    }
 
 def create_jsonl(input_files, output_file):
     with open(output_file, "w") as out_f:
