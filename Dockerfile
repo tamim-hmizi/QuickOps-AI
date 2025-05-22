@@ -1,9 +1,9 @@
-# ======================= BASE ENVIRONNEMENT PYTHON =======================
+# ========================== BASE ENV ==========================
 FROM python:3.10-slim AS python-base
 
 WORKDIR /app
 
-# Dépendances système nécessaires à tous les stades
+# Dépendances système nécessaires
 RUN apt-get update && apt-get install -y \
   git \
   cmake \
@@ -13,30 +13,28 @@ RUN apt-get update && apt-get install -y \
   ninja-build \
   && rm -rf /var/lib/apt/lists/*
 
-# Copie requirements.txt et installation des dépendances sans llama-cpp-python
+# Copier requirements et installer sans llama-cpp-python
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip
 RUN grep -v llama-cpp-python requirements.txt > temp-req.txt && pip install --no-cache-dir -r temp-req.txt
 
-# ✅ Installation propre de llama-cpp-python en CPU-mode
+# ✅ Cloner llama-cpp-python AVEC ses submodules
 ENV CMAKE_ARGS="-DLLAMA_CUBLAS=OFF"
-RUN git clone https://github.com/abetlen/llama-cpp-python.git && \
+RUN git clone --recurse-submodules https://github.com/abetlen/llama-cpp-python.git && \
   cd llama-cpp-python && pip install .
 
-# ======================= STAGE 1 : FINE-TUNING =======================
+# ========================== STAGE 1 : TRAIN ==========================
 FROM python-base AS builder
 
 COPY . ./
 ENV PYTHONPATH=/app
 
-# Génération du dataset
 RUN python scripts/prepare_dataset.py
 
-# Entraînement + fusion GGUF
 RUN axolotl train model/axolotl-config.yaml && \
   axolotl merge model/final-checkpoint --output model/final-checkpoint/merged.gguf
 
-# ======================= STAGE 2 : API =======================
+# ========================== STAGE 2 : API ==========================
 FROM python-base AS runner
 
 COPY --from=builder /app/app ./app
