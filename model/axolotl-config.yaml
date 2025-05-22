@@ -9,7 +9,7 @@ gptq: false
 
 datasets:
   - path: ./data/training.jsonl
-    type: json
+    type: alpaca
 
 dataset_prepared_path: ./data/processed
 val_set_size: 0.05
