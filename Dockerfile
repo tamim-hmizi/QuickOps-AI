@@ -1,46 +1,38 @@
-# ============================
-# STAGE 1: TRAINING + MERGE
-# ============================
+# ============ STAGE 1: TRAIN + MERGE ============
 FROM python:3.10-slim AS builder
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
   libopenblas-dev \
-  curl \
   build-essential \
   cmake \
   git \
-  && rm -rf /var/lib/apt/lists/*
+  curl && \
+  rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
   pip install --no-cache-dir -r requirements.txt
 
-COPY ./app ./app
-COPY ./data ./data
-COPY ./model ./model
-COPY ./scripts ./scripts
-
+COPY . ./
 ENV PYTHONPATH=/app
 
-# Prepare dataset
+# Préparation dataset
 RUN python scripts/prepare_dataset.py
 
-# Fine-tune and merge CPU-based model
+# Entraînement + fusion modèle
 RUN axolotl train model/axolotl-config.yaml && \
   axolotl merge model/final-checkpoint --output model/final-checkpoint/merged.gguf
 
-# ============================
-# STAGE 2: API ONLY
-# ============================
+# ============ STAGE 2: INFERENCE API ============
 FROM python:3.10-slim
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y libopenblas-dev && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --from=builder /app/app ./app
