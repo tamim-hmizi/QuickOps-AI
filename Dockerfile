@@ -15,22 +15,23 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip
 
-# ✅ Installer tous sauf llama-cpp-python
+# Installer tout sauf llama-cpp-python
 RUN grep -v llama-cpp-python requirements.txt > temp-req.txt && \
   pip install --no-cache-dir -r temp-req.txt
 
-# ✅ Installer Axolotl SANS bitsandbytes
+# Installer axolotl sans bitsandbytes
 RUN pip install --no-cache-dir axolotl --no-deps
 
-# ✅ Installer manuellement ses dépendances critiques
+# Installer ses dépendances critiques
 RUN pip install --no-cache-dir \
   fire \
   pydantic \
   accelerate \
   datasets \
-  colorama
+  colorama \
+  addict
 
-# ✅ Installer llama-cpp-python (CPU only)
+# Installer llama-cpp-python (CPU-only)
 ENV CMAKE_ARGS="-DLLAMA_CUBLAS=OFF"
 RUN git clone --recurse-submodules https://github.com/abetlen/llama-cpp-python.git && \
   cd llama-cpp-python && pip install .
