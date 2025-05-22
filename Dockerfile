@@ -1,40 +1,58 @@
-# ============ STAGE 1: TRAIN + MERGE ============
+# ============================ STAGE 1: TRAINING ============================
 FROM python:3.10-slim AS builder
 
 WORKDIR /app
 
+# Dépendances système pour le build et llama-cpp-python
 RUN apt-get update && apt-get install -y \
-  libopenblas-dev \
-  build-essential \
-  cmake \
   git \
-  curl && \
-  rm -rf /var/lib/apt/lists/*
+  cmake \
+  build-essential \
+  libopenblas-dev \
+  curl \
+  ninja-build \
+  && rm -rf /var/lib/apt/lists/*
 
+# Installer pip & dépendances Python (sans llama-cpp-python)
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip && \
-  pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip
+RUN grep -v llama-cpp-python requirements.txt > temp-req.txt && pip install --no-cache-dir -r temp-req.txt
 
+# Installer llama-cpp-python CPU-only manuellement
+RUN git clone https://github.com/abetlen/llama-cpp-python.git && \
+  cd llama-cpp-python && \
+  pip install --no-cache-dir . --config-settings=--build-option=--use-cpu
+
+# Copier code et dataset
 COPY . ./
 ENV PYTHONPATH=/app
 
-# Préparation dataset
+# Préparation dataset pour le fine-tuning
 RUN python scripts/prepare_dataset.py
 
-# Entraînement + fusion modèle
+# Fine-tuning via Axolotl + fusion GGUF finale
 RUN axolotl train model/axolotl-config.yaml && \
   axolotl merge model/final-checkpoint --output model/final-checkpoint/merged.gguf
 
-# ============ STAGE 2: INFERENCE API ============
-FROM python:3.10-slim
+# ============================ STAGE 2: API ============================
+FROM python:3.10-slim AS runner
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y libopenblas-dev && rm -rf /var/lib/apt/lists/*
+# Installer dépendances système minimales
+RUN apt-get update && apt-get install -y libopenblas-dev cmake ninja-build && rm -rf /var/lib/apt/lists/*
 
+# Installer pip & dépendances Python (sans llama-cpp-python)
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip
+RUN grep -v llama-cpp-python requirements.txt > temp-req.txt && pip install --no-cache-dir -r temp-req.txt
 
+# Installer llama-cpp-python CPU-only manuellement
+RUN git clone https://github.com/abetlen/llama-cpp-python.git && \
+  cd llama-cpp-python && \
+  pip install --no-cache-dir . --config-settings=--build-option=--use-cpu
+
+# Copier le code de l’API + modèle entraîné
 COPY --from=builder /app/app ./app
 COPY --from=builder /app/model/final-checkpoint ./model/final-checkpoint
 

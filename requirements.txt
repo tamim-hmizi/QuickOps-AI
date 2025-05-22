@@ -8,5 +8,5 @@ sentencepiece
 datasets
 loguru
 python-dotenv
-llama-cpp-python
 axolotl
+# llama-cpp-python est installé manuellement
