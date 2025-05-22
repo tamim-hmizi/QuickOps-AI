@@ -4,7 +4,7 @@ trust_remote_code: true
 device_map: auto
 
 load_in_8bit: false
-load_in_4bit: true
+load_in_4bit: false
 gptq: false
 
 datasets:
@@ -14,7 +14,7 @@ datasets:
 dataset_prepared_path: ./data/processed
 val_set_size: 0.05
 
-adapter: qlora
+adapter: lora
 lora_r: 8
 lora_alpha: 16
 lora_dropout: 0.1
