@@ -8,4 +8,5 @@ sentencepiece
 datasets
 loguru
 python-dotenv
-axolotl
+fire
+pydantic
