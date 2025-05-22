@@ -16,8 +16,11 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install axolotl without extra GPU-related dependencies
-RUN pip install --no-cache-dir axolotl --no-deps
+# Clone Axolotl and patch it to remove bitsandbytes
+RUN git clone https://github.com/OpenAccess-AI-Collective/axolotl.git && \
+  cd axolotl && \
+  sed -i '/bitsandbytes/d' axolotl/utils/models.py && \
+  pip install .
 
 # ========================== STAGE 1: TRAIN ==========================
 FROM python-base AS builder
