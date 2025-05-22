@@ -16,7 +16,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install axolotl from source (no deps, we provide manually)
+# Install axolotl without extra GPU-related dependencies
 RUN pip install --no-cache-dir axolotl --no-deps
 
 # ========================== STAGE 1: TRAIN ==========================
