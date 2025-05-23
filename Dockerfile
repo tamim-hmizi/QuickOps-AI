@@ -3,7 +3,7 @@ FROM python:3.10-slim AS python-base
 
 WORKDIR /app
 
-# Install system dependencies
+# System dependencies
 RUN apt-get update && apt-get install -y \
   git \
   cmake \
@@ -19,10 +19,9 @@ RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Clone, patch and install Axolotl (CPU-only, no bitsandbytes)
-RUN git clone https://github.com/OpenAccess-AI-Collective/axolotl.git && \
-  cd axolotl && \
-  sed -i '/bitsandbytes/d' axolotl/utils/models.py && \
-  pip install .
+RUN git clone https://github.com/OpenAccess-AI-Collective/axolotl.git /axolotl && \
+  sed -i '/bitsandbytes/d' /axolotl/axolotl/utils/models.py && \
+  pip install /axolotl
 
 # ========================== STAGE 1: TRAIN ==========================
 FROM python-base AS builder
@@ -30,7 +29,6 @@ FROM python-base AS builder
 COPY . .
 ENV PYTHONPATH=/app
 
-# Prepare dataset
 RUN python scripts/prepare_dataset.py && \
   axolotl prepare_datasets model/axolotl-config.yaml && \
   axolotl train model/axolotl-config.yaml && \
