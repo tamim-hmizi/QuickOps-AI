@@ -27,16 +27,16 @@ lora_target_modules:
   - up_proj
   - down_proj
 
-sequence_len: 2048
+sequence_len: 512
 pad_to_sequence_len: true
 sample_packing: false
 train_on_inputs: false
 
 gradient_checkpointing: true
-gradient_accumulation_steps: 4
-micro_batch_size: 1
+gradient_accumulation_steps: 1
+micro_batch_size: 4
 
-num_epochs: 3
+num_epochs: 1
 optimizer: adamw_torch
 lr_scheduler: cosine
 learning_rate: 2e-5

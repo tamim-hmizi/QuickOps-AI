@@ -3,7 +3,7 @@ FROM python:3.10-slim AS python-base
 
 WORKDIR /app
 
-# System dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
   git \
   cmake \
@@ -13,15 +13,15 @@ RUN apt-get update && apt-get install -y \
   ninja-build \
   && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Clone, patch and install Axolotl (fully remove bitsandbytes)
+# Clone, patch and install Axolotl (CPU-only, no bitsandbytes)
 RUN git clone https://github.com/OpenAccess-AI-Collective/axolotl.git && \
   cd axolotl && \
-  grep -rl bitsandbytes . | xargs sed -i '/bitsandbytes/d' && \
+  sed -i '/bitsandbytes/d' axolotl/utils/models.py && \
   pip install .
 
 # ========================== STAGE 1: TRAIN ==========================
@@ -30,9 +30,10 @@ FROM python-base AS builder
 COPY . .
 ENV PYTHONPATH=/app
 
-RUN python scripts/prepare_dataset.py
-
-RUN axolotl train model/axolotl-config.yaml && \
+# Prepare dataset
+RUN python scripts/prepare_dataset.py && \
+  axolotl prepare_datasets model/axolotl-config.yaml && \
+  axolotl train model/axolotl-config.yaml && \
   axolotl merge model/final-checkpoint --output model/final-checkpoint/merged.gguf
 
 # ========================== STAGE 2: API ==========================

@@ -2,9 +2,7 @@ import json
 from app.utils.analyzer import generate_prompt
 
 def convert_to_prompt(project_json):
-    instruction = "Based on the given architecture, recommend 'k8s' or 'vm'."
-    input_text = generate_prompt(project_json)
-
+    prompt = generate_prompt(project_json)
     if any("k8s" in topic or "kubernetes" in topic for backend in project_json["backends"] for topic in backend["metadata"]["topics"]):
         output = {
             "recommendation": "k8s",
@@ -15,10 +13,9 @@ def convert_to_prompt(project_json):
             "recommendation": "vm",
             "explanation": "Monolithic architecture without orchestration favors VM deployment."
         }
-
     return {
-        "instruction": instruction,
-        "input": input_text,
+        "instruction": "Based on the software architecture, decide the deployment.",
+        "input": prompt,
         "output": json.dumps(output)
     }
 
