@@ -18,9 +18,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Clone, patch and install Axolotl (CPU-only, no bitsandbytes)
+# Clone, patch and install Axolotl (CPU-only, remove bitsandbytes)
 RUN git clone https://github.com/OpenAccess-AI-Collective/axolotl.git /axolotl && \
-  sed -i '/bitsandbytes/d' /axolotl/axolotl/utils/models.py && \
+  sed -i '/bitsandbytes/d' /axolotl/src/axolotl/utils/models.py && \
   pip install /axolotl
 
 # ========================== STAGE 1: TRAIN ==========================
