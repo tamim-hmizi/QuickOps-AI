@@ -1,6 +1,7 @@
 import requests
 import json
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 
@@ -16,6 +17,15 @@ class Output(BaseModel):
     reasoning: str
 
 app = FastAPI()
+
+# ✅ CORS middleware to fix CORS errors from frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or specify: ["http://localhost:5173"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def fetch_metadata(repo_url, token: str):
     clean_url = repo_url.rstrip('/').replace('.git', '')
