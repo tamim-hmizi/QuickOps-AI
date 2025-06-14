@@ -1,4 +1,5 @@
 import requests
+import json
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
@@ -67,15 +68,15 @@ def ask_llm(prompt):
     resp = requests.post("http://localhost:11434/api/generate", json=payload, stream=True)
     resp.raise_for_status()
 
-    output = ""
+    full_output = ""
     for line in resp.iter_lines():
         if line:
             try:
-                data = requests.utils.json.loads(line.decode("utf-8"))
-                output += data.get("response", "")
-            except Exception:
+                data = json.loads(line.decode("utf-8"))
+                full_output += data.get("response", "")
+            except Exception as e:
                 continue
-    return output
+    return full_output
 
 @app.post("/suggest", response_model=Output)
 def suggest(input: Input):
