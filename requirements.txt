@@ -1,14 +1,4 @@
 fastapi
 uvicorn
-transformers
-peft
-accelerate
-scipy
-sentencepiece
-datasets
-loguru
-python-dotenv
-fire
-pydantic
-colorama
-addict
+requests
+httpx
