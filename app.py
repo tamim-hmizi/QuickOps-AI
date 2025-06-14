@@ -12,12 +12,12 @@ class Input(BaseModel):
     token: str  # GitHub PAT
 
 class Output(BaseModel):
-    raw: str  # Full unparsed LLM response
+    recommendation: str
+    reasoning: str
 
 app = FastAPI()
 
 def fetch_metadata(repo_url, token: str):
-    # Sanitize URL: remove trailing slash and .git
     clean_url = repo_url.rstrip('/').replace('.git', '')
     parts = clean_url.split('/')
     owner, repo = parts[-2], parts[-1]
@@ -27,13 +27,11 @@ def fetch_metadata(repo_url, token: str):
         "Accept": "application/vnd.github+json"
     }
 
-    # Fetch repo metadata
     resp = requests.get(f"{GITHUB_API}/{owner}/{repo}", headers=headers)
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=f"GitHub fetch failed: {resp.text}")
     data = resp.json()
 
-    # Check if Dockerfile exists in main branch
     docker_url = f"https://raw.githubusercontent.com/{owner}/{repo}/main/Dockerfile"
     docker_resp = requests.get(docker_url, headers=headers)
     has_dockerfile = docker_resp.status_code == 200
@@ -74,9 +72,21 @@ def ask_llm(prompt):
             try:
                 data = json.loads(line.decode("utf-8"))
                 full_output += data.get("response", "")
-            except Exception as e:
+            except Exception:
                 continue
     return full_output
+
+def parse_response(llm_text):
+    recommendation = ""
+    reasoning = ""
+    for line in llm_text.splitlines():
+        if line.lower().startswith("recommendation:"):
+            recommendation = line.split(":", 1)[1].strip()
+        elif line.lower().startswith("reasoning:"):
+            reasoning = line.split(":", 1)[1].strip()
+        elif reasoning and line.strip():
+            reasoning += " " + line.strip()
+    return recommendation, reasoning
 
 @app.post("/suggest", response_model=Output)
 def suggest(input: Input):
@@ -84,4 +94,5 @@ def suggest(input: Input):
     metadata = [fetch_metadata(url, input.token) for url in all_urls]
     prompt = build_prompt(metadata)
     llm_reply = ask_llm(prompt)
-    return Output(raw=llm_reply)
+    recommendation, reasoning = parse_response(llm_reply)
+    return Output(recommendation=recommendation, reasoning=reasoning)
