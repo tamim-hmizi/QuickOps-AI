@@ -11,8 +11,7 @@ class Input(BaseModel):
     token: str  # GitHub PAT
 
 class Output(BaseModel):
-    recommendation: str
-    reasoning: str
+    raw: str  # Full unparsed LLM response
 
 app = FastAPI()
 
@@ -64,10 +63,19 @@ def build_prompt(metadata_list):
     return prompt
 
 def ask_llm(prompt):
-    payload = {"model": "llama3.2", "prompt": prompt}
-    resp = requests.post("http://localhost:11434/api/generate", json=payload)
+    payload = {"model": "llama3.2", "prompt": prompt, "stream": True}
+    resp = requests.post("http://localhost:11434/api/generate", json=payload, stream=True)
     resp.raise_for_status()
-    return resp.json()["response"]
+
+    output = ""
+    for line in resp.iter_lines():
+        if line:
+            try:
+                data = requests.utils.json.loads(line.decode("utf-8"))
+                output += data.get("response", "")
+            except Exception:
+                continue
+    return output
 
 @app.post("/suggest", response_model=Output)
 def suggest(input: Input):
@@ -75,13 +83,4 @@ def suggest(input: Input):
     metadata = [fetch_metadata(url, input.token) for url in all_urls]
     prompt = build_prompt(metadata)
     llm_reply = ask_llm(prompt)
-
-    # Parse LLM output
-    recommendation = ""
-    reasoning = ""
-    for line in llm_reply.splitlines():
-        if line.lower().startswith("recommendation:"):
-            recommendation = line.split(":", 1)[1].strip()
-        elif line.lower().startswith("reasoning:"):
-            reasoning = line.split(":", 1)[1].strip()
-    return Output(recommendation=recommendation, reasoning=reasoning)
+    return Output(raw=llm_reply)
