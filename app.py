@@ -17,20 +17,23 @@ class Output(BaseModel):
 app = FastAPI()
 
 def fetch_metadata(repo_url, token: str):
-    parts = repo_url.rstrip('/').split('/')
+    # Sanitize URL: remove trailing slash and .git
+    clean_url = repo_url.rstrip('/').replace('.git', '')
+    parts = clean_url.split('/')
     owner, repo = parts[-2], parts[-1]
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json"
     }
 
-    # Repo metadata
+    # Fetch repo metadata
     resp = requests.get(f"{GITHUB_API}/{owner}/{repo}", headers=headers)
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=f"GitHub fetch failed: {resp.text}")
     data = resp.json()
 
-    # Check for Dockerfile
+    # Check if Dockerfile exists in main branch
     docker_url = f"https://raw.githubusercontent.com/{owner}/{repo}/main/Dockerfile"
     docker_resp = requests.get(docker_url, headers=headers)
     has_dockerfile = docker_resp.status_code == 200
