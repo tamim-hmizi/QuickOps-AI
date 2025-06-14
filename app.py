@@ -21,7 +21,7 @@ app = FastAPI()
 # ✅ CORS middleware to fix CORS errors from frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or specify: ["http://localhost:5173"]
+    allow_origins=["*"],  # Use specific origins for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,7 +68,12 @@ def build_prompt(metadata_list):
         prompt += f"  Forks: {meta['forks']}\n"
         prompt += f"  Has Dockerfile: {meta['has_dockerfile']}\n"
         prompt += f"  Topics: {', '.join(meta['topics'])}\n\n"
-    prompt += "Answer in this format:\nRecommendation: <Kubernetes or VM>\nReasoning: <why>\n"
+
+    prompt += (
+        "Please strictly follow this output format:\n"
+        "Recommendation: <Kubernetes or VM>\n"
+        "Reasoning: <Full explanation on why this choice was made>\n"
+    )
     return prompt
 
 def ask_llm(prompt):
@@ -84,18 +89,31 @@ def ask_llm(prompt):
                 full_output += data.get("response", "")
             except Exception:
                 continue
+
+    # Optional: print raw LLM output for debugging
+    print("\n===== RAW LLM OUTPUT =====\n", full_output, "\n==========================\n")
     return full_output
 
 def parse_response(llm_text):
     recommendation = ""
     reasoning = ""
-    for line in llm_text.splitlines():
-        if line.lower().startswith("recommendation:"):
+    lines = llm_text.strip().splitlines()
+
+    for line in lines:
+        if "recommendation:" in line.lower():
             recommendation = line.split(":", 1)[1].strip()
-        elif line.lower().startswith("reasoning:"):
+        elif "reasoning:" in line.lower():
             reasoning = line.split(":", 1)[1].strip()
         elif reasoning and line.strip():
             reasoning += " " + line.strip()
+
+    # Fallback if no proper labels found
+    if not recommendation:
+        if "kubernetes" in llm_text.lower():
+            recommendation = "Kubernetes"
+        elif "vm" in llm_text.lower():
+            recommendation = "VM"
+
     return recommendation, reasoning
 
 @app.post("/suggest", response_model=Output)
