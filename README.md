@@ -67,8 +67,16 @@ curl -X POST http://localhost:8001/suggest \
 |---|---|---|
 | `OLLAMA_URL` | `http://localhost:11434` | Base URL of the Ollama server |
 | `OLLAMA_MODEL` | `llama3.2` | Model used for the recommendation |
+| `CORS_ORIGINS` | `*` | Comma-separated origins allowed to call the API |
 
-There is no automated test suite yet.
+### Tests
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest
+```
+
+The tests stub GitHub and Ollama, so they need neither network access nor a model.
 
 ## Project context
 

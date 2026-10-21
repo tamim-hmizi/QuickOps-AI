@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 import requests
 from fastapi import FastAPI, HTTPException
@@ -22,17 +23,17 @@ class Output(BaseModel):
 
 app = FastAPI()
 
-# ✅ CORS middleware to fix CORS errors from frontend
+# The GitHub token travels in the request body, so no cookies or credentials are needed.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Use specific origins for production
-    allow_credentials=True,
+    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 def fetch_metadata(repo_url, token: str):
-    clean_url = repo_url.rstrip('/').replace('.git', '')
+    clean_url = repo_url.rstrip('/').removesuffix('.git')
     parts = clean_url.split('/')
     owner, repo = parts[-2], parts[-1]
 
@@ -41,13 +42,13 @@ def fetch_metadata(repo_url, token: str):
         "Accept": "application/vnd.github+json"
     }
 
-    resp = requests.get(f"{GITHUB_API}/{owner}/{repo}", headers=headers)
+    resp = requests.get(f"{GITHUB_API}/{owner}/{repo}", headers=headers, timeout=30)
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=f"GitHub fetch failed: {resp.text}")
     data = resp.json()
 
     docker_url = f"https://raw.githubusercontent.com/{owner}/{repo}/main/Dockerfile"
-    docker_resp = requests.get(docker_url, headers=headers)
+    docker_resp = requests.get(docker_url, headers=headers, timeout=30)
     has_dockerfile = docker_resp.status_code == 200
 
     return {
@@ -113,9 +114,9 @@ def parse_response(llm_text):
 
     # Fallback if no proper labels found
     if not recommendation:
-        if "kubernetes" in llm_text.lower():
+        if re.search(r"\bkubernetes\b", llm_text, re.IGNORECASE):
             recommendation = "Kubernetes"
-        elif "vm" in llm_text.lower():
+        elif re.search(r"\bvm\b|virtual machine", llm_text, re.IGNORECASE):
             recommendation = "VM"
 
     return recommendation, reasoning
