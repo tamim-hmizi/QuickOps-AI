@@ -40,3 +40,9 @@ jobs:
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"
+          format: json
+          output: trivy.json
+      - name: Report findings
+        if: failure()
+        run: |
+          jq -r '.Results[]? | .Target as $t | .Vulnerabilities[]? | "::error title=\(.VulnerabilityID)::\($t): \(.PkgName) \(.InstalledVersion) -> \(.FixedVersion) (\(.Severity))"' trivy.json
