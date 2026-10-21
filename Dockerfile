@@ -15,6 +15,8 @@ COPY entrypoint.sh /entrypoint.sh
 COPY requirements.txt app.py ./
 
 # Setup
-RUN chmod +x /entrypoint.sh && pip install --no-cache-dir -r requirements.txt
+RUN chmod +x /entrypoint.sh && \
+    pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
 ENTRYPOINT ["/entrypoint.sh"]
