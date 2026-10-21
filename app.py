@@ -1,11 +1,15 @@
-import requests
 import json
+import os
+
+import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 
 GITHUB_API = "https://api.github.com/repos"
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 class Input(BaseModel):
     frontend: str
@@ -77,8 +81,8 @@ def build_prompt(metadata_list):
     return prompt
 
 def ask_llm(prompt):
-    payload = {"model": "llama3.2", "prompt": prompt, "stream": True}
-    resp = requests.post("http://localhost:11434/api/generate", json=payload, stream=True)
+    payload = {"model": OLLAMA_MODEL, "prompt": prompt, "stream": True}
+    resp = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, stream=True, timeout=300)
     resp.raise_for_status()
 
     full_output = ""
