@@ -6,10 +6,10 @@ QuickOps AI is the recommendation service of QuickOps, a DevOps-as-a-Service pla
 
 - `POST /suggest` endpoint taking `frontend` (URL), `backends` (list of URLs) and `token` (GitHub personal access token)
 - Fetches metadata from the GitHub API for each repository: full name, stars, forks, language, topics, and whether a `Dockerfile` exists on `main`
-- Builds a DevOps-expert prompt and streams the answer from Ollama (`llama3.2` at `http://localhost:11434`)
+- Builds a DevOps-expert prompt and streams the answer from Ollama (`llama3.2` by default)
 - Parses the answer into `recommendation` (`Kubernetes` or `VM`) and `reasoning`, with a keyword fallback
 - CORS enabled for the web console
-- Docker image bundling Ollama and the API: the entrypoint starts Ollama, pulls the model and launches Uvicorn on port 8001
+- Small, non-root API image; Ollama runs as its own container from the official image, wired up in `compose.yaml`
 
 ## Tech stack
 
@@ -45,12 +45,13 @@ ollama pull llama3.2
 uvicorn app:app --host 0.0.0.0 --port 8001
 ```
 
-### Run with Docker
+### Run with Docker Compose
 
 ```bash
-docker build -t quickops-ai .
-docker run -p 8001:8001 -p 11434:11434 quickops-ai
+docker compose up --build
 ```
+
+This starts Ollama, pulls `llama3.2` into a named volume on the first run, then starts the API on port 8001.
 
 ### Example request
 
@@ -60,7 +61,14 @@ curl -X POST http://localhost:8001/suggest \
   -d '{"frontend":"https://github.com/<owner>/<frontend>","backends":["https://github.com/<owner>/<backend>"],"token":"<GITHUB_TOKEN>"}'
 ```
 
-No environment variables are required. There is no automated test suite yet.
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `OLLAMA_URL` | `http://localhost:11434` | Base URL of the Ollama server |
+| `OLLAMA_MODEL` | `llama3.2` | Model used for the recommendation |
+
+There is no automated test suite yet.
 
 ## Project context
 

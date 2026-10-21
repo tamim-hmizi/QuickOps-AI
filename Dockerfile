@@ -1,22 +1,21 @@
 FROM python:3.11-slim
 
-# Install curl and Ollama dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg libssl-dev zstd && \
-    curl -fsSL https://ollama.com/install.sh | sh && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Expose Ollama and FastAPI ports
-EXPOSE 8001 11434
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Copy project files
-COPY entrypoint.sh /entrypoint.sh
-COPY requirements.txt app.py ./
+COPY requirements.txt .
+# pip, setuptools and wheel are only needed to install; removing them keeps
+# their vendored packages out of the runtime image.
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip uninstall -y pip setuptools wheel && \
+    rm -rf /usr/local/lib/python3.11/ensurepip
 
-# Setup
-RUN chmod +x /entrypoint.sh && \
-    pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+COPY app.py .
 
-ENTRYPOINT ["/entrypoint.sh"]
+RUN useradd --system --uid 10001 app
+USER app
+
+EXPOSE 8001
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001"]
