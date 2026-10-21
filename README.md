@@ -64,4 +64,4 @@ No environment variables are required. There is no automated test suite yet.
 
 ## Project context
 
-RFC final year project, 2025, by Tamim Hmizi — https://tamim-hmizi.github.io/Portfolio/
+RFC final year project, 2025, by Tamim Hmizi: https://tamim-hmizi.github.io/Portfolio/
