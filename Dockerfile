@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 # Install curl and Ollama dependencies
-RUN apt-get update && apt-get install -y curl libssl-dev gnupg && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg libssl-dev zstd && \
     curl -fsSL https://ollama.com/install.sh | sh && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
