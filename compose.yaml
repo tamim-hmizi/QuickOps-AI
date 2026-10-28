@@ -1,6 +1,6 @@
 services:
   ollama:
-    image: ollama/ollama:0.40.7
+    image: ollama/ollama:0.40.11
     volumes:
       - ollama:/root/.ollama
     healthcheck:
@@ -10,7 +10,7 @@ services:
 
   # Pulls the model once into the shared volume, then exits.
   model:
-    image: ollama/ollama:0.40.7
+    image: ollama/ollama:0.40.11
     environment:
       OLLAMA_HOST: http://ollama:11434
     entrypoint: ["ollama", "pull", "llama3.2"]
